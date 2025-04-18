@@ -82,13 +82,13 @@ export default function TabLayout() {
             elevation: 0,
             backgroundColor: colorScheme === 'dark' ? '#000' : '#fff',
             borderTopColor: colorScheme === 'dark' ? '#333' : '#ddd',
-            height: 65,
-            paddingBottom: 10,
+            height: Platform.OS === 'ios' ? 85 : 65,
+            paddingBottom: Platform.OS === 'ios' ? 30 : 20,
             zIndex: 999,
           },
           tabBarItemStyle: {
             paddingTop: 3,
-            paddingBottom: 3,
+            paddingBottom: Platform.OS === 'ios' ? 10 : 3,
           },
           tabBarLabelStyle: {
             fontSize: 10,
