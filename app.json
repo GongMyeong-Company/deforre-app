@@ -1,21 +1,53 @@
 {
   "expo": {
-    "name": "my-app",
+    "name": "호텔드포레 Staff",
     "slug": "my-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icon/ios/AppIcon~ios-marketing.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "notification": {
+      "icon": "./assets/icon/android/play_store_512.png",
+      "color": "#4B7F52"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hotelapp.deforetstaff",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "이 앱은 QR 코드 스캔 및 사진 업로드를 위해 카메라에 접근합니다.",
+        "NSPhotoLibraryUsageDescription": "이 앱은 사진 업로드를 위해 사진 라이브러리에 접근합니다.",
+        "NSPhotoLibraryAddUsageDescription": "이 앱은 다운로드한 사진을 저장하기 위해 사진 라이브러리에 접근합니다.",
+        "NSLocationWhenInUseUsageDescription": "이 앱은 가까운 호텔 시설을 찾기 위해 위치 정보에 접근합니다.",
+        "UIBackgroundModes": ["remote-notification", "fetch", "processing"]
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/icon/android/play_store_512.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.hotelapp.deforetstaff",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -25,17 +57,30 @@
     "plugins": [
       "expo-router",
       [
-        "expo-splash-screen",
+        "expo-notifications",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "icon": "./assets/icon/android/play_store_512.png",
+          "color": "#4B7F52",
+          "sounds": []
         }
       ]
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "cd8dc31c-6c50-48aa-b242-20465a1fec79"
+      }
+    },
+    "owner": "hyoon27",
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/cd8dc31c-6c50-48aa-b242-20465a1fec79"
     }
   }
 }

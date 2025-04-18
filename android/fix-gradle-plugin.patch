@@ -1,0 +1,11 @@
+--- settings.gradle.kts	2024-08-01 12:00:00
++++ settings.gradle.kts	2024-08-01 12:00:00
+@@ -11,7 +11,7 @@
+   }
+ }
+ 
+-plugins { id("org.gradle.toolchains.foojay-resolver-convention").version("0.5.0") }
++// plugins { id("org.gradle.toolchains.foojay-resolver-convention").version("0.5.0") }
+ 
+ include(
+     ":react-native-gradle-plugin", 

@@ -1,0 +1,38 @@
+{
+  "cli": {
+    "version": ">= 5.9.1"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "development-simulator": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle",
+        "image": "ubuntu-20.04-jdk-8-ndk-r21e",
+        "gradleCommand": ":app:bundleRelease"
+      }
+    },
+    "local": {
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "withoutCredentials": true
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

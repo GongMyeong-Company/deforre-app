@@ -1,0 +1,8 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" rx="20" fill="#F5F5F5"/>
+  <path d="M40 50H160V150H40V50Z" fill="#4B7F52"/>
+  <path d="M70 70H130V130H70V70Z" fill="#FFFFFF"/>
+  <path d="M50 140H150" stroke="#D4AF37" stroke-width="4" stroke-linecap="round"/>
+  <path d="M70 90L83 110L100 80L117 110L130 90" stroke="#D4AF37" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="100" y="170" font-family="Arial" font-size="14" font-weight="bold" fill="#4B7F52" text-anchor="middle">HOTEL DE FORET</text>
+</svg> 

@@ -5,8 +5,8 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest --watchAll",
     "lint": "expo lint"
@@ -16,20 +16,30 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.2",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-firebase/storage": "^21.14.0",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
     "expo": "~52.0.46",
     "expo-blur": "~14.0.3",
+    "expo-build-properties": "~0.13.2",
     "expo-constants": "~17.0.8",
+    "expo-dev-client": "~5.0.20",
+    "expo-device": "^7.0.3",
     "expo-font": "~13.0.4",
     "expo-haptics": "~14.0.1",
+    "expo-image-picker": "~16.0.6",
     "expo-linking": "~7.0.5",
+    "expo-notifications": "^0.29.14",
     "expo-router": "~4.0.20",
     "expo-splash-screen": "~0.29.24",
     "expo-status-bar": "~2.0.1",
     "expo-symbols": "~0.2.2",
     "expo-system-ui": "~4.0.9",
+    "expo-task-manager": "~12.0.6",
+    "expo-updates": "~0.27.4",
     "expo-web-browser": "~14.0.2",
+    "firebase": "^11.6.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-native": "0.76.9",
@@ -50,5 +60,44 @@
     "react-test-renderer": "18.3.1",
     "typescript": "^5.3.3"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "name": "호텔드포레 Staff",
+    "slug": "my-app",
+    "scheme": "myapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "experiments": {
+      "typedRoutes": true
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hotelapp.deforetstaff"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.hotelapp.deforetstaff"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "listUnknownPackages": false
+      }
+    }
+  }
 }
