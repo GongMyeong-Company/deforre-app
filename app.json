@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "호텔드포레 Staff",
-    "slug": "my-app",
+    "slug": "hotel-staff",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon/ios/AppIcon~ios-marketing.png",
@@ -21,14 +21,20 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.hotelapp.deforetstaff",
+      "bundleIdentifier": "com.gongmyeong.hotelstaff",
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "이 앱은 QR 코드 스캔 및 사진 업로드를 위해 카메라에 접근합니다.",
         "NSPhotoLibraryUsageDescription": "이 앱은 사진 업로드를 위해 사진 라이브러리에 접근합니다.",
         "NSPhotoLibraryAddUsageDescription": "이 앱은 다운로드한 사진을 저장하기 위해 사진 라이브러리에 접근합니다.",
         "NSLocationWhenInUseUsageDescription": "이 앱은 가까운 호텔 시설을 찾기 위해 위치 정보에 접근합니다.",
-        "UIBackgroundModes": ["remote-notification", "fetch", "processing"]
+        "UIBackgroundModes": [
+          "remote-notification",
+          "fetch"
+        ],
+        "BGTaskSchedulerPermittedIdentifiers": [
+          "com.gongmyeong.hotelstaff.refresh"
+        ]
       }
     },
     "android": {
@@ -36,7 +42,7 @@
         "foregroundImage": "./assets/icon/android/play_store_512.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.hotelapp.deforetstaff",
+      "package": "com.gongmyeong.hotelstaff",
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -75,10 +81,10 @@
         "origin": false
       },
       "eas": {
-        "projectId": "cd8dc31c-6c50-48aa-b242-20465a1fec79"
+        "projectId": "a71ca3aa-e410-4889-a789-7ecba748ca87"
       }
     },
-    "owner": "hyoon27",
+    "owner": "gongmyeong",
     "runtimeVersion": "1.0.0",
     "updates": {
       "enabled": false

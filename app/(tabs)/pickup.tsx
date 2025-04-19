@@ -34,7 +34,7 @@ type GuestItem = {
   wingsCount?: string;
   roomType?: string;
   status: 'RR' | 'CI' | 'CO'; // 예약, 체크인, 체크아웃
-  guestCount?: string; // rooms 컬렉션에서 가져온 인원수
+  guestCount?: string; // 인원수
 };
 
 export default function PickupPage() {
@@ -212,74 +212,40 @@ export default function PickupPage() {
     setGuestListLoading(true);
     
     try {
+      // guestList 컬렉션에서 데이터 가져오기
       const q = query(collection(db, 'guestList'));
       
-      const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-        const guestItems: GuestItem[] = [];
-        const fetchPromises: Promise<GuestItem>[] = [];
+      const querySnapshot = await getDocs(q);
+      const guestItems: GuestItem[] = [];
+      
+      querySnapshot.forEach((docSnap) => {
+        const guestData = docSnap.data();
+        const docId = docSnap.id;
         
-        querySnapshot.forEach((docSnap) => {
-          const guestData = docSnap.data() as Omit<GuestItem, 'id'>;
-          const docId = docSnap.id;
-          
-          // Room 정보 가져오기 위한 Promise 생성
-          const fetchPromise = async (): Promise<GuestItem> => {
-            try {
-              const roomRef = doc(db, 'rooms', guestData.roomNumber);
-              const roomSnap = await getDoc(roomRef);
-              
-              let guestCount = '-';
-              if (roomSnap.exists()) {
-                const roomData = roomSnap.data();
-                guestCount = (roomData?.guestCount as any)?.toString() || '-';
-              }
-              
-              return {
-                id: docId,
-                ...guestData,
-                guestCount
-              };
-            } catch (error) {
-              console.error('Room 정보 가져오기 오류:', error);
-              return {
-                id: docId,
-                ...guestData,
-                guestCount: '-'
-              };
-            }
-          };
-          
-          fetchPromises.push(fetchPromise());
+        // 필요한 필드들만 추출하여 추가
+        guestItems.push({
+          id: docId,
+          roomNumber: guestData.roomNumber || '',
+          guestName: guestData.guestName || '',
+          wingsCount: guestData.wingsCount || '',
+          roomType: guestData.roomType || '',
+          status: guestData.status || 'CI',
+          guestCount: guestData.guestCount || ''
         });
-        
-        // 모든 Promise가 완료될 때까지 대기
-        const results = await Promise.all(fetchPromises);
-        
-        // 정렬: 숫자 우선, 그 다음 문자열
-        results.sort((a, b) => {
-          const aRoom = parseInt(a.roomNumber);
-          const bRoom = parseInt(b.roomNumber);
-          
-          // 둘 다 숫자인 경우 숫자 비교
-          if (!isNaN(aRoom) && !isNaN(bRoom)) {
-            return aRoom - bRoom;
-          }
-          
-          // a만 숫자인 경우 a가 앞으로
-          if (!isNaN(aRoom)) return -1;
-          
-          // b만 숫자인 경우 b가 앞으로
-          if (!isNaN(bRoom)) return 1;
-          
-          // 둘 다 숫자가 아닌 경우 문자열 비교
-          return a.roomNumber.localeCompare(b.roomNumber);
-        });
-        
-        setGuestList(results);
-        setGuestListLoading(false);
       });
       
-      return () => unsubscribe();
+      // 정렬: 이름순으로 정렬
+      guestItems.sort((a, b) => {
+        // 이름이 없는 경우 빈 문자열로 처리
+        const aName = a.guestName || '';
+        const bName = b.guestName || '';
+        
+        // 이름 기준 오름차순 정렬 (한글 정렬을 위해 'ko' 로케일 사용)
+        return aName.localeCompare(bName, 'ko');
+      });
+      
+      setGuestList(guestItems);
+      setGuestListLoading(false);
     } catch (error) {
       console.error('투숙객 명단 가져오기 오류:', error);
       setGuestListLoading(false);

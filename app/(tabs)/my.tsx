@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { validateAdminPassword } from '@/config/admin-auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 export default function MyPage() {
   const [user, setUser] = useState(auth.currentUser);
@@ -223,74 +224,146 @@ export default function MyPage() {
     }
   };
   
+  // 이미지 리사이징 함수 추가
+  const resizeImage = async (uri: string): Promise<string> => {
+    try {
+      console.log('이미지 리사이징 시작:', uri);
+      
+      // 이미지 리사이징 - 최대 800x800 크기로 조정, 품질 80%
+      const manipResult = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 800, height: 800 } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      
+      console.log('이미지 리사이징 완료:', manipResult.uri);
+      console.log('원본 이미지 크기와 리사이징된 이미지 비교 필요');
+      
+      return manipResult.uri;
+    } catch (error) {
+      console.error('이미지 리사이징 오류:', error);
+      // 리사이징에 실패하면 원본 URI 반환
+      return uri;
+    }
+  };
+
+  // 기존 uploadImage 함수를 더 간단하게 수정
   const uploadImage = async (uri: string) => {
     if (!user || !user.email) return;
     
     setUploadingImage(true);
     try {
-      // 이미지 파일 가져오기
-      const response = await fetch(uri);
+      console.log('이미지 업로드 시작:', uri);
+      
+      // 이미지 리사이징 추가
+      const resizedImageUri = await resizeImage(uri);
+      console.log('리사이징된 이미지 사용:', resizedImageUri);
+      
+      // 이미지 파일 가져오기 (한 번만 실행)
+      const response = await fetch(resizedImageUri);
       const blob = await response.blob();
+      console.log('이미지 블롭 준비됨, 크기:', blob.size, 'bytes');
       
       // 파일 확장자 추출 및 고유한 파일 이름 생성
-      const fileExtension = uri.split('.').pop() || 'jpg';
+      const fileExtension = resizedImageUri.split('.').pop() || 'jpg';
       const fileName = `profile_${Date.now()}.${fileExtension}`;
+      console.log('파일명:', fileName);
       
-      // 스토리지 참조 가져오기
-      const storage = getStorage();
-      const storageRef = ref(storage, `profile_images/${fileName}`);
-      
-      // 메타데이터 추가
-      const metadata = {
-        contentType: `image/${fileExtension}`,
-      };
-      
-      // 이미지 업로드
-      await uploadBytes(storageRef, blob, metadata);
-      
-      // 이미지 URL 가져오기
-      const downloadURL = await getDownloadURL(storageRef);
-      
-      // 사용자 이메일로 users 컬렉션에서 문서 검색 (userDocId가 없는 경우)
-      if (!userDocId) {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('email', '==', user.email));
-        const querySnapshot = await getDocs(q);
+      try {
+        // Base64로 변환하여 직접 저장
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
         
-        if (!querySnapshot.empty) {
-          const userDocRef = querySnapshot.docs[0].ref;
-          await updateDoc(userDocRef, {
-            profileImage: downloadURL
-          });
-          setUserDocId(querySnapshot.docs[0].id);
-        } else {
-          // 문서가 없으면 새로 생성
-          const newUserDocRef = doc(collection(db, 'users'));
-          await setDoc(newUserDocRef, {
-            email: user.email,
-            name: userName || user.email.split('@')[0],
-            profileImage: downloadURL,
-            createdAt: new Date()
-          });
-          setUserDocId(newUserDocRef.id);
-        }
-      } else {
-        // userDocId가 있는 경우 직접 업데이트
-        await updateDoc(doc(db, 'users', userDocId), {
-            profileImage: downloadURL
-        });
+        reader.onloadend = async () => {
+          try {
+            const base64data = reader.result as string;
+            // base64 데이터에서 헤더 제거 (data:image/jpeg;base64, 부분)
+            const base64Content = base64data.split(',')[1];
+            console.log('Base64 변환 완료, 크기:', Math.round(base64Content.length / 1024), 'KB');
+            
+            // 사용자 문서에 직접 base64 이미지 저장
+            if (userDocId) {
+              console.log('사용자 문서 업데이트 중...');
+              await updateDoc(doc(db, 'users', userDocId), {
+                profileImage: base64data,
+                profileImageUpdatedAt: new Date()
+              });
+              console.log('사용자 문서 업데이트 완료');
+            } else {
+              // 이메일로 문서 검색
+              console.log('사용자 문서 검색 중...');
+              const usersRef = collection(db, 'users');
+              const q = query(usersRef, where('email', '==', user.email));
+              const querySnapshot = await getDocs(q);
+              
+              if (!querySnapshot.empty) {
+                const userDocRef = querySnapshot.docs[0].ref;
+                await updateDoc(userDocRef, {
+                  profileImage: base64data,
+                  profileImageUpdatedAt: new Date()
+                });
+                setUserDocId(querySnapshot.docs[0].id);
+                console.log('사용자 문서 업데이트 완료');
+              } else {
+                // 문서가 없으면 새로 생성
+                console.log('사용자 문서 생성 중...');
+                const newUserDocRef = doc(collection(db, 'users'));
+                await setDoc(newUserDocRef, {
+                  email: user.email,
+                  name: userName || (user.email ? user.email.split('@')[0] : '사용자'),
+                  profileImage: base64data,
+                  profileImageUpdatedAt: new Date(),
+                  createdAt: new Date()
+                });
+                setUserDocId(newUserDocRef.id);
+                console.log('사용자 문서 생성 완료');
+              }
+            }
+            
+            // 캐시 및 상태 업데이트
+            console.log('이미지 캐싱 중...');
+            const cacheKey = `profileImage_${user.email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const cacheData = JSON.stringify({
+              base64: base64Content,
+              timestamp: Date.now()
+            });
+            await AsyncStorage.setItem(cacheKey, cacheData);
+            
+            setProfileImage(base64data);
+            console.log('이미지 업데이트 완료');
+            
+            Alert.alert('성공', '프로필 이미지가 업데이트되었습니다.');
+          } catch (saveError: any) {
+            console.error('이미지 저장 오류:', saveError);
+            Alert.alert('오류', '이미지 저장 중 문제가 발생했습니다.');
+          } finally {
+            setUploadingImage(false);
+          }
+        };
+        
+        reader.onerror = (error) => {
+          console.error('Base64 변환 오류:', error);
+          Alert.alert('오류', 'Base64 변환 중 오류가 발생했습니다.');
+          setUploadingImage(false);
+        };
+      } catch (uploadError: any) {
+        console.error('Firebase 업로드 오류:', uploadError);
+        console.error('오류 코드:', uploadError?.code);
+        console.error('오류 메시지:', uploadError?.message);
+        
+        // 오류 처리 및 사용자에게 알림
+        Alert.alert('업로드 실패', '이미지 업로드 중 문제가 발생했습니다. 다시 시도해주세요.', [
+          { text: '확인' },
+          { 
+            text: '재시도', 
+            onPress: () => uploadImage(uri)
+          }
+        ]);
+        setUploadingImage(false);
       }
-      
-      // 로컬 캐시에 이미지 URL 저장
-      await cacheProfileImage(downloadURL);
-      
-      // 상태 업데이트
-      setProfileImage(downloadURL);
-      Alert.alert('성공', '프로필 이미지가 업데이트되었습니다.');
-    } catch (error) {
-      console.error('이미지 업로드 오류:', error);
-      Alert.alert('오류', '이미지 업로드 중 문제가 발생했습니다.');
-    } finally {
+    } catch (error: any) {
+      console.error('전체 업로드 과정 오류:', error);
+      Alert.alert('오류', '이미지를 처리하는 중 문제가 발생했습니다.');
       setUploadingImage(false);
     }
   };

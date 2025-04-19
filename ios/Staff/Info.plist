@@ -28,13 +28,13 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>myapp</string>
-          <string>com.hotelapp.deforetstaff</string>
+          <string>com.gongmyeong.hotelstaff</string>
         </array>
       </dict>
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>exp+my-app</string>
+          <string>exp+hotel-staff</string>
         </array>
       </dict>
     </array>
@@ -69,7 +69,10 @@
     <array>
       <string>remote-notification</string>
       <string>fetch</string>
-      <string>processing</string>
+    </array>
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array>
+      <string>com.gongmyeong.hotelstaff.refresh</string>
     </array>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>

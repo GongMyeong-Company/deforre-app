@@ -69,8 +69,15 @@ export default function NotificationsScreen() {
                 const guestName = data.data.guestName;
                 const requestType = data.data.requestType;
                 
-                if (roomNumber && guestName && requestType) {
-                  const roomNumberText = roomNumber ? `${roomNumber}호 ` : '';
+                if (guestName && requestType) {
+                  // 객실 호수가 유효한 값인 경우에만 "호"를 붙임
+                  let roomNumberText = '';
+                  if (roomNumber && typeof roomNumber === 'string' && roomNumber.trim() !== '') {
+                    roomNumberText = `${roomNumber}호 `;
+                  } else if (roomNumber && typeof roomNumber === 'number' && roomNumber > 0) {
+                    roomNumberText = `${roomNumber}호 `;
+                  }
+                  
                   notificationItem.body = `${roomNumberText}${guestName} ${requestType}`;
                 }
               }
@@ -136,8 +143,15 @@ export default function NotificationsScreen() {
               const guestName = data.data.guestName;
               const requestType = data.data.requestType;
               
-              if (roomNumber && guestName && requestType) {
-                const roomNumberText = roomNumber ? `${roomNumber}호 ` : '';
+              if (guestName && requestType) {
+                // 객실 호수가 유효한 값인 경우에만 "호"를 붙임
+                let roomNumberText = '';
+                if (roomNumber && typeof roomNumber === 'string' && roomNumber.trim() !== '') {
+                  roomNumberText = `${roomNumber}호 `;
+                } else if (roomNumber && typeof roomNumber === 'number' && roomNumber > 0) {
+                  roomNumberText = `${roomNumber}호 `;
+                }
+                
                 notificationItem.body = `${roomNumberText}${guestName} ${requestType}`;
               }
             }

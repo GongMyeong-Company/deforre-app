@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, FlatList, ActivityIndicator, SectionList, TouchableOpacity, Alert, RefreshControl, ScrollView, TextInput, BackHandler, Animated } from 'react-native';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { collection, query, onSnapshot, doc, updateDoc, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, where, getDocs, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '@/config/firebase';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { validateAdminPassword } from '@/config/admin-auth';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { createPickupRequest, createCleaningRequest, createMaintenanceRequest } from '@/utils/notifications';
 
 // 객실 정보 타입 정의
 interface RoomData {
@@ -72,6 +73,9 @@ const TextWithColor = ({ style, children, ...props }: any) => (
 
 // 모달 상태 관리를 위한 전역 플래그 추가
 let isModalTransitioning = false;
+
+// CleanType 타입 확인 및 유지
+type CleanType = 'clean' | 'inspect' | 'reset';
 
 const styles = StyleSheet.create({
   container: {
@@ -617,7 +621,7 @@ export default function RoomPage() {
     fetchRooms();
   };
   
-  // 상태 버튼 클릭 핸들러
+  // 상태 버튼 클릭 핸들러 수정
   const handleStatusButtonPress = (room: RoomData) => {
     // 재실 상태일 때만 체크아웃 모달 표시
     if (room.status === 'checked_in' || room.status === 'checked_out' || room.status === '재실') {
@@ -634,11 +638,9 @@ export default function RoomPage() {
     }
   };
 
-  // 체크아웃 버튼 핸들러
-  const handleCheckout = (withPickupRequest: boolean) => {
+  // 체크아웃 버튼 핸들러 수정
+  const handleCheckout = (withPickupRequest = false) => {
     if (!selectedRoom) return;
-    
-    const roomInfo = selectedRoom;
     
     if (withPickupRequest) {
       // 인원수 모달로 전환
@@ -647,12 +649,12 @@ export default function RoomPage() {
       // 모달 닫고 체크아웃 처리
       closeAllModals();
       setTimeout(() => {
-        processCheckout(roomInfo, false);
+        processCheckout(withPickupRequest);
       }, 300);
     }
   };
   
-  // 인원수 확인 핸들러
+  // 인원수 확인 핸들러 수정
   const handleConfirmPeopleCount = () => {
     if (!selectedRoom) return;
     
@@ -660,12 +662,11 @@ export default function RoomPage() {
     const count = peopleCount.trim() || '1'; // 입력값이 없으면 기본값 1로 설정
     
     // 모달 닫기
-    const roomInfo = selectedRoom;
     closeAllModals();
     
     // 체크아웃 처리
     setTimeout(() => {
-      processCheckout(roomInfo, true, count);
+      processCheckout(true, count);
       setPeopleCount(''); // 인원수 초기화
     }, 300);
   };
@@ -698,106 +699,162 @@ export default function RoomPage() {
       closeAllModals();
       setAdminPassword('');
       
-      try {
-        // @ts-ignore
-        navigation.setParams({ isAdmin: true });
-      } catch (error) {
-        console.error('헤더 업데이트 오류:', error);
-      }
-      
       Alert.alert('성공', '관리자로 인증되었습니다.');
     } else {
       Alert.alert('오류', '비밀번호가 일치하지 않습니다.');
     }
   };
   
-  // 정비 상태 업데이트 핸들러
-  const handleCleanStatusUpdate = async () => {
-    if (!selectedRoom || !cleanType) return;
+  // 정비 상태 업데이트 핸들러 수정
+  const handleCleanStatusUpdate = async (type: CleanType) => {
+    if (!selectedRoom) return;
 
+    setIsLoading(true);
+    const roomRef = doc(db, 'rooms', selectedRoom.id);
     const user = getCurrentUser();
-    if (!user) {
-        Alert.alert('오류', '사용자 인증이 필요합니다.');
-        return;
+    
+    if (!user || !user.email) {
+      Alert.alert('오류', '로그인 정보를 찾을 수 없습니다.');
+      setIsLoading(false);
+      return;
     }
 
-    // 현재 사용자의 이름 가져오기
     try {
-        const userQuery = query(
-            collection(db, 'users'),
-            where('email', '==', user.email)
-        );
-        const userSnapshot = await getDocs(userQuery);
-        
-        if (userSnapshot.empty) {
-            Alert.alert('오류', '사용자 정보를 찾을 수 없습니다.');
-            return;
-        }
-
+      // 사용자 이름 가져오기
+      const userQuery = query(
+        collection(db, 'users'), 
+        where('email', '==', user.email)
+      );
+      const userSnapshot = await getDocs(userQuery);
+      let userName = user.email;
+      
+      if (!userSnapshot.empty) {
         const userData = userSnapshot.docs[0].data();
-        const userName = userData.name || user.email?.split('@')[0] || '알 수 없음';
+        userName = userData.name || user.email.split('@')[0];
+      }
 
-        const roomRef = doc(db, 'rooms', selectedRoom.id);
-        const updateData: any = {};
-
-        if (cleanType === 'clean') {
-            updateData.clean = 'VC';
-            updateData.cleanedAt = new Date().toISOString();
-            updateData.cleanedBy = userName;  // 이메일 대신 이름으로 저장
-        } else if (cleanType === 'inspect') {
-            updateData.clean = 'VI';
-            updateData.inspectedAt = new Date().toISOString();
-            updateData.inspectedBy = userName;  // 이메일 대신 이름으로 저장
-        } else if (cleanType === 'reset') {
-            updateData.clean = 'VD';
-            updateData.cleanedAt = null;
-            updateData.cleanedBy = null;
-            updateData.inspectedAt = null;
-            updateData.inspectedBy = null;
+      let updateData = {};
+      
+      if (type === 'clean') {
+        updateData = { 
+          clean: 'VC', 
+          cleanedBy: userName, // 이메일 대신 이름 사용
+          cleanedAt: serverTimestamp() 
+        };
+        
+        // 청소 완료 알림 생성
+        try {
+          await createCleaningRequest(selectedRoom.roomNumber, userName);
+          console.log('청소 완료 알림이 생성되었습니다.');
+        } catch (notificationError) {
+          console.error('알림 생성 실패:', notificationError);
+          // 알림 생성에 실패해도 청소 상태 업데이트는 계속 진행
         }
-
-        await updateDoc(roomRef, updateData);
-        setCleanModalVisible(false);
-        Alert.alert('성공', '객실 상태가 업데이트되었습니다.');
+      } else if (type === 'inspect') {
+        updateData = { 
+          clean: 'VI', 
+          inspectedBy: userName, // 이메일 대신 이름 사용
+          inspectedAt: serverTimestamp() 
+        };
+        
+        // 점검 완료 알림 생성
+        try {
+          await createMaintenanceRequest(selectedRoom.roomNumber, userName, '객실 점검 완료');
+          console.log('점검 완료 알림이 생성되었습니다.');
+        } catch (notificationError) {
+          console.error('알림 생성 실패:', notificationError);
+          // 알림 생성에 실패해도 점검 상태 업데이트는 계속 진행
+        }
+      } else if (type === 'reset') {
+        updateData = { 
+          clean: 'VD', 
+          cleanedBy: '', 
+          cleanedAt: null, 
+          inspectedBy: '', 
+          inspectedAt: null 
+        };
+      }
+      
+      await updateDoc(roomRef, updateData);
+      Alert.alert('성공', '상태가 업데이트되었습니다.');
+      setIsLoading(false);
+      navigation.navigate('(tabs)' as never);
     } catch (error) {
-        console.error('객실 상태 업데이트 실패:', error);
-        Alert.alert('오류', '객실 상태 업데이트에 실패했습니다.');
+      console.error('상태 업데이트 오류:', error);
+      Alert.alert('오류', '상태 업데이트 중 오류가 발생했습니다.');
+      setIsLoading(false);
     }
   };
   
-  // 체크아웃 처리 함수
-  const processCheckout = async (roomInfo: RoomData, withPickupRequest: boolean, peopleCount?: string) => {
-    const roomRef = doc(db, 'rooms', roomInfo.id);
+  // 체크아웃 처리 함수 수정
+  const processCheckout = async (withPickupRequest = false, peopleCount = '1') => {
     try {
-        // 객실 데이터 초기화 (정비 상태 제외)
-        await updateDoc(roomRef, {
-            status: 'empty',
-            guestName: '',
-            checkIn: '',
-            checkOut: ''
-        });
+      if (!selectedRoom) return;
 
-        // 픽업 요청이 있는 경우
-        if (withPickupRequest && peopleCount) {
-            const pickupRef = collection(db, 'todo');
-            const newPickup = {
-                roomNumber: roomInfo.roomNumber,
-                guestName: roomInfo.guestName,
-                peopleCount: peopleCount,
-                content: '체크아웃',
-                status: 'new',
-                createdAt: serverTimestamp(),
-                wingsCount: '0'
-            };
-            
-            // 픽업 요청 추가
-            await addDoc(pickupRef, newPickup);
+      const roomRef = doc(db, 'rooms', selectedRoom.id);
+      const user = getCurrentUser();
+      
+      if (!user || !user.email) {
+        Alert.alert('오류', '로그인 정보를 찾을 수 없습니다.');
+        setIsLoading(false);
+        return;
+      }
+
+      // 픽업 요청이 있는 경우 처리
+      if (withPickupRequest) {
+        try {
+          // 사용자 이름 가져오기
+          const userQuery = query(
+            collection(db, 'users'),
+            where('email', '==', user.email)
+          );
+          const userSnapshot = await getDocs(userQuery);
+          let userName = user.email;
+          
+          if (!userSnapshot.empty) {
+            const userData = userSnapshot.docs[0].data();
+            userName = userData.name || user.email.split('@')[0];
+          }
+
+          // 픽업 요청 알림 생성
+          await createPickupRequest(
+            selectedRoom.roomNumber,
+            userName
+          );
+          console.log('픽업 요청 알림이 생성되었습니다.');
+          
+          // Todo 컬렉션에 추가
+          await addDoc(collection(db, 'todo'), {
+            type: 'pickup',
+            roomNumber: selectedRoom.roomNumber,
+            createdAt: serverTimestamp(),
+            createdBy: userName, // 이메일 대신 이름 사용
+            status: 'pending',
+            peopleCount: peopleCount
+          });
+        } catch (notificationError) {
+          console.error('알림 생성 실패:', notificationError);
+          // 알림 생성에 실패해도 체크아웃 프로세스는 계속 진행
         }
+      }
 
-        Alert.alert('성공', withPickupRequest ? '체크아웃 처리 및 픽업 요청이 완료되었습니다.' : '체크아웃 처리가 완료되었습니다.');
+      // 객실 데이터 삭제
+      await deleteDoc(roomRef);
+
+      // 성공 메시지 표시
+      Alert.alert(
+        '체크아웃 완료',
+        withPickupRequest ? '체크아웃 및 픽업 요청이 완료되었습니다.' : '체크아웃이 완료되었습니다.'
+      );
+
+      // 모달 닫기
+      setCheckoutModalVisible(false);
+      setIsLoading(false);
+      navigation.navigate('(tabs)' as never);
     } catch (error) {
-        console.error('체크아웃 처리 실패:', error);
-        Alert.alert('오류', '체크아웃 처리에 실패했습니다.');
+      console.error('체크아웃 처리 오류:', error);
+      Alert.alert('오류', '체크아웃 처리 중 오류가 발생했습니다.');
+      setIsLoading(false);
     }
   };
   
@@ -1207,7 +1264,7 @@ export default function RoomPage() {
                 
                 <TouchableOpacity 
                   style={styles.modalConfirmButton}
-                  onPress={handleCleanStatusUpdate}
+                  onPress={() => handleCleanStatusUpdate(cleanType)}
                 >
                   <TextWithColor style={styles.modalButtonText}>확인</TextWithColor>
                 </TouchableOpacity>

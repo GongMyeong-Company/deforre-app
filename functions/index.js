@@ -12,7 +12,8 @@ const logger = require("firebase-functions/logger");
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const fetch = require('node-fetch');
-const {onDocumentCreated} = require("firebase-functions/v2/firestore");
+const {onDocumentCreated, onDocumentUpdated} = require("firebase-functions/v2/firestore");
+const axios = require('axios');
 
 // Create and deploy your first functions
 // https://firebase.google.com/docs/functions/get-started
@@ -23,6 +24,12 @@ const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 // });
 
 admin.initializeApp();
+
+// Slack Webhook URL을 환경변수로 설정합니다 - 배포 시 Firebase 콘솔에서 설정해야 합니다
+// const SLACK_WEBHOOK_URL = functions.config().slack.webhook_url;
+
+// 테스트용 임시 URL (실제 배포 시에는 위의 환경변수를 사용해야 합니다)
+const SLACK_WEBHOOK_URL = 'https://hooks.slack.com/services/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';
 
 /**
  * 호텔 앱 알림 기능 - Firebase Cloud Functions
@@ -375,6 +382,60 @@ exports.sendChatNotification = onDocumentCreated({
     return null;
   } catch (error) {
     logger.error('채팅 알림 전송 중 오류 발생:', error);
+    return null;
+  }
+});
+
+/**
+ * todo 컬렉션에 새 문서가 생성될 때 실행되는 함수
+ */
+exports.sendTodoToSlack = onDocumentCreated({
+  document: "todo/{todoId}",
+  region: "asia-northeast3"
+}, async (event) => {
+  try {
+    const snapshot = event.data;
+    if (!snapshot) {
+      console.error('투두 데이터가 없습니다.');
+      return null;
+    }
+    
+    const todoData = snapshot.data();
+    const todoId = event.params.todoId;
+    
+    // 데이터 확인
+    if (!todoData) {
+      console.error('투두 데이터가 없습니다.');
+      return null;
+    }
+
+    const { roomNumber, guestName, content, type } = todoData;
+
+    // 슬랙 메시지 포맷 간단하게 구성
+    const message = {
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `🚗 ${roomNumber} ${guestName || ''} ${content || type || ''}`
+          }
+        }
+      ],
+      // 메시지 색상만 설정 
+      attachments: [
+        {
+          color: '#36a64f'
+        }
+      ]
+    };
+    
+    // Slack API에 메시지 전송
+    const response = await axios.post(SLACK_WEBHOOK_URL, message);
+    console.log('투두 슬랙 메시지 전송 성공:', response.status);
+    return null;
+  } catch (error) {
+    console.error('투두 슬랙 메시지 전송 실패:', error);
     return null;
   }
 });

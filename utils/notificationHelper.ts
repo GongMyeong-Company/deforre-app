@@ -172,9 +172,16 @@ export async function sendLocalNotification(title: string, body: string, data?: 
       const guestName = data.guestName;
       const requestType = data.requestType;
       
-      // 객실 호수가 있을 때만 "호"를 붙임
-      if (roomNumber && guestName && requestType) {
-        const roomNumberText = roomNumber ? `${roomNumber}호 ` : '';
+      // 게스트 이름과 요청 유형이 있는 경우에만 처리
+      if (guestName && requestType) {
+        // 객실 호수가 유효한 값인 경우에만 "호"를 붙임
+        let roomNumberText = '';
+        if (roomNumber && typeof roomNumber === 'string' && roomNumber.trim() !== '') {
+          roomNumberText = `${roomNumber}호 `;
+        } else if (roomNumber && typeof roomNumber === 'number' && roomNumber > 0) {
+          roomNumberText = `${roomNumber}호 `;
+        }
+        
         body = `${roomNumberText}${guestName} ${requestType}`;
         
         // 제목도 더 명확하게 설정
