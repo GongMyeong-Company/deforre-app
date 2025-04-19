@@ -8,6 +8,7 @@ import { validateAdminPassword } from '@/config/admin-auth';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '@/config/firebase';
+import Checkbox from 'expo-checkbox';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -15,22 +16,36 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
+  const [rememberLogin, setRememberLogin] = useState(false);
 
   // 저장된 로그인 정보 불러오기
   useEffect(() => {
-    const loadSavedEmail = async () => {
+    const loadSavedLoginInfo = async () => {
       try {
         const savedEmail = await AsyncStorage.getItem('user_email');
-        if (savedEmail) {
-          console.log('저장된 이메일 불러옴:', savedEmail);
+        const savedRemember = await AsyncStorage.getItem('remember_login');
+        const savedPassword = await AsyncStorage.getItem('user_password');
+        
+        if (savedRemember === 'true') {
+          setRememberLogin(true);
+          
+          if (savedEmail) {
+            setEmail(savedEmail);
+          }
+          
+          if (savedPassword) {
+            setPassword(savedPassword);
+          }
+        } else if (savedEmail) {
+          // 이전 버전 호환성 유지
           setEmail(savedEmail);
         }
       } catch (error) {
-        console.error('저장된 이메일 불러오기 실패:', error);
+        console.error('저장된 로그인 정보 불러오기 실패:', error);
       }
     };
     
-    loadSavedEmail();
+    loadSavedLoginInfo();
   }, []);
 
   // 로그인 기능
@@ -46,12 +61,20 @@ export default function LoginScreen() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
-      // 로그인 성공 시 이메일 저장
-      await AsyncStorage.setItem('user_email', email);
-      
-      // 로그인 정보 로컬 저장
-      try {
+      // 로그인 정보 저장 설정에 따라 처리
+      if (rememberLogin) {
+        await AsyncStorage.setItem('user_email', email);
         await AsyncStorage.setItem('user_password', password);
+        await AsyncStorage.setItem('remember_login', 'true');
+      } else {
+        // 저장 안함 설정이면 비밀번호만 제거하고 이메일은 편의상 남김
+        await AsyncStorage.setItem('user_email', email);
+        await AsyncStorage.removeItem('user_password');
+        await AsyncStorage.setItem('remember_login', 'false');
+      }
+      
+      // 기본 로그인 정보 저장
+      try {
         await AsyncStorage.setItem('user_uid', user.uid);
         await AsyncStorage.setItem('user_last_login', new Date().toISOString());
         await AsyncStorage.setItem('user_is_logged_in', 'true');
@@ -147,6 +170,19 @@ export default function LoginScreen() {
             />
           </View>
 
+          {/* 로그인 정보 저장 체크박스 */}
+          <View style={styles.checkboxContainer}>
+            <Checkbox
+              value={rememberLogin}
+              onValueChange={setRememberLogin}
+              color={rememberLogin ? '#4B7F52' : undefined}
+              style={styles.checkbox}
+            />
+            <TouchableOpacity onPress={() => setRememberLogin(!rememberLogin)}>
+              <ThemedText style={styles.checkboxLabel}>로그인 정보 저장</ThemedText>
+            </TouchableOpacity>
+          </View>
+          
           {/* 버튼 */}
           <TouchableOpacity 
             style={styles.loginButton} 
@@ -344,5 +380,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     marginLeft: 10,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  checkbox: {
+    marginRight: 8,
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: '#555',
   },
 }); 
