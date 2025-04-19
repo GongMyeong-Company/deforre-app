@@ -3,7 +3,7 @@ import { StyleSheet, View, TouchableOpacity, FlatList, ActivityIndicator, Refres
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { collection, query, orderBy, onSnapshot, updateDoc, doc, getDoc, addDoc, serverTimestamp, deleteDoc, where, getDocs } from 'firebase/firestore';
-import { db, auth } from '@/config/firebase';
+import { auth, db } from '@/config/firebase';
 import { TextWithColor } from '@/components/ThemedText';
 import { router, useLocalSearchParams } from 'expo-router';
 import { validateAdminPassword } from '@/config/admin-auth';
@@ -185,7 +185,7 @@ export default function PickupPage() {
   // 완료 처리 함수
   const handleCompleteTodo = async (id: string) => {
     try {
-      console.log('[알림 디버깅] 완료 처리 시작:', id);
+      console.log('완료 처리 시작:', id);
       
       const now = new Date().toISOString();
       const currentUser = auth.currentUser;
@@ -200,29 +200,10 @@ export default function PickupPage() {
         completedBy: completedBy
       });
       
-      console.log('[알림 디버깅] 완료 상태로 업데이트됨');
-      
-      // 완료 알림은 필요하다면 여기서 직접 보내고, Cloud Functions는 자동으로 실행되지 않음
-      // 완료 알림은 중요하므로 유지 (필요에 따라 제거 가능)
-      if (selectedTodo) {
-        const message = `${selectedTodo.roomNumber}호 ${selectedTodo.guestName} ${selectedTodo.content}`;
-        console.log('[알림 디버깅] 완료 알림 전송:', message);
-        
-        await sendUpdateNotification(
-          id,
-          '픽업요청 완료',
-          `${message} 완료처리 되었습니다.`,
-          { status: 'completed', roomNumber: selectedTodo.roomNumber, guestName: selectedTodo.guestName }
-        );
-      } else {
-        console.log('[알림 디버깅] selectedTodo가 없어 완료 알림을 보내지 않음');
-      }
-      
-      // fetchTodos 함수가 정의되어 있지 않으므로 제거
-      // onSnapshot을 사용하고 있으므로 실시간으로 업데이트됨
-      console.log('[알림 디버깅] 완료 처리 종료');
+      console.log('완료 상태로 업데이트됨');
+      console.log('완료 처리 종료');
     } catch (error) {
-      console.error('[알림 디버깅] 완료 처리 오류:', error);
+      console.error('완료 처리 오류:', error);
     }
   };
   
@@ -231,10 +212,7 @@ export default function PickupPage() {
     setGuestListLoading(true);
     
     try {
-      const q = query(
-        collection(db, 'guestList')
-        // Firestore에서는 한글 정렬이 잘 안되므로 클라이언트에서 정렬
-      );
+      const q = query(collection(db, 'guestList'));
       
       const unsubscribe = onSnapshot(q, async (querySnapshot) => {
         const guestItems: GuestItem[] = [];
@@ -262,7 +240,7 @@ export default function PickupPage() {
                 guestCount
               };
             } catch (error) {
-              console.error(`Error fetching room data for ${guestData.roomNumber}:`, error);
+              console.error('Room 정보 가져오기 오류:', error);
               return {
                 id: docId,
                 ...guestData,
@@ -274,32 +252,36 @@ export default function PickupPage() {
           fetchPromises.push(fetchPromise());
         });
         
-        // 모든 Promise 병렬 실행
+        // 모든 Promise가 완료될 때까지 대기
         const results = await Promise.all(fetchPromises);
         
-        // 결과를 guestItems에 추가
-        guestItems.push(...results);
-        
-        // 고객명 기준으로 가나다순 정렬
-        const sortedGuestItems = guestItems.sort((a, b) => {
-          // 이름이 없는 경우 맨 뒤로
-          if (!a.guestName) return 1;
-          if (!b.guestName) return -1;
+        // 정렬: 숫자 우선, 그 다음 문자열
+        results.sort((a, b) => {
+          const aRoom = parseInt(a.roomNumber);
+          const bRoom = parseInt(b.roomNumber);
           
-          return a.guestName.localeCompare(b.guestName, 'ko');
+          // 둘 다 숫자인 경우 숫자 비교
+          if (!isNaN(aRoom) && !isNaN(bRoom)) {
+            return aRoom - bRoom;
+          }
+          
+          // a만 숫자인 경우 a가 앞으로
+          if (!isNaN(aRoom)) return -1;
+          
+          // b만 숫자인 경우 b가 앞으로
+          if (!isNaN(bRoom)) return 1;
+          
+          // 둘 다 숫자가 아닌 경우 문자열 비교
+          return a.roomNumber.localeCompare(b.roomNumber);
         });
         
-        setGuestList(sortedGuestItems);
-        setGuestListLoading(false);
-      }, (error) => {
-        console.error('Error fetching guest list:', error);
+        setGuestList(results);
         setGuestListLoading(false);
       });
       
-      // 컴포넌트 언마운트 시 구독 해제
-      return unsubscribe;
+      return () => unsubscribe();
     } catch (error) {
-      console.error('Error setting up guest list listener:', error);
+      console.error('투숙객 명단 가져오기 오류:', error);
       setGuestListLoading(false);
     }
   };
@@ -331,19 +313,21 @@ export default function PickupPage() {
   
   // 요청 확인 모달 제출 핸들러
   const handleRequestSubmit = async () => {
-    if (!selectedGuest || !requestType || !requestPeopleCount) {
-      alert('모든 필드를 입력해주세요.');
+    if (!selectedGuest || !requestType) {
+      console.log('선택된 투숙객 또는 요청 타입이 없습니다.');
       return;
     }
+
+    // 인원수 유효성 검사
+    if (!requestPeopleCount.trim()) {
+      console.log('인원수를 입력해주세요.');
+      return;
+    }
+
+    setRequestModalVisible(false);
     
+    // Firestore에 todo 항목 추가
     try {
-      console.log('[알림 디버깅] 픽업 요청 시작');
-      
-      // 모달 닫기
-      setRequestModalVisible(false);
-      setGuestListModalVisible(false); // 명단 모달도 닫기
-      
-      // todo 컬렉션에 요청 추가
       const todoData = {
         roomNumber: selectedGuest.roomNumber,
         guestName: selectedGuest.guestName,
@@ -354,40 +338,19 @@ export default function PickupPage() {
         wingsCount: selectedGuest.wingsCount || '0'
       };
       
-      console.log('[알림 디버깅] todo 추가 시작:', todoData);
+      console.log('Todo 추가 시작:', todoData);
       
       const docRef = await addDoc(collection(db, 'todo'), todoData);
-      console.log('[알림 디버깅] 요청 문서 생성됨:', docRef.id);
+      console.log('요청 문서 생성됨:', docRef.id);
       
-      // 알림 데이터 구성
-      const notificationData = {
-        type: 'pickup_request',
-        todoId: docRef.id,
-        roomNumber: selectedGuest.roomNumber,
-        guestName: selectedGuest.guestName,
-        requestType: requestType,
-        timestamp: new Date().getTime() // 중복 제거용 타임스탬프
-      };
+      // 모달 닫기 및 상태 초기화
+      setRequestType(null);
+      setRequestPeopleCount('');
+      setSelectedGuest(null);
       
-      // 객실 호수가 있을 때만 "호"를 붙임
-      const roomNumberText = selectedGuest.roomNumber ? `${selectedGuest.roomNumber}호 ` : '';
-      const bodyText = `${roomNumberText}${selectedGuest.guestName} ${requestType}`;
-      
-      console.log('[알림 디버깅] todo 문서가 생성됨 - Cloud Functions가 알림을 자동으로 처리합니다');
-      
-      // todo 컬렉션에 문서가 추가되면 Firebase Cloud Functions가 자동으로 알림을 보내므로
-      // 여기서 직접 알림을 보내면 중복 알림이 발생합니다.
-      // sendPushToAllUsers 호출을 제거하여 알림 중복 방지
-      // await sendPushToAllUsers('새로운 픽업요청', bodyText, notificationData);
-      
-      console.log('[알림 디버깅] 알림 중복 방지를 위해 sendPushToAllUsers 호출 생략');
-      
-      // 성공 메시지
-      alert('요청이 성공적으로 등록되었습니다.');
-      console.log('[알림 디버깅] 픽업 요청 처리 완료');
+      console.log('요청이 성공적으로 추가되었습니다.');
     } catch (error) {
-      console.error('[알림 디버깅] 요청 등록 오류:', error);
-      alert('요청 등록에 실패했습니다. 다시 시도해주세요.');
+      console.error('요청 추가 오류:', error);
     }
   };
   
@@ -459,43 +422,44 @@ export default function PickupPage() {
   
   // 전체 삭제 요청
   const handleBulkDelete = async () => {
-    if (!isAdminDeleteAuth) {
-      setAdminPassword('');
-      setAdminAuthError('');
+    if (!isAdmin) {
       setAdminAuthModalVisible(true);
+      setIsAdminDeleteAuth(true);
       return;
     }
+    
+    // 사용자에게 최종 확인
+    setShowDeleteConfirmation(true);
+  };
+
+  // 일괄 삭제 확인
+  const confirmBulkDelete = async () => {
+    setShowDeleteConfirmation(false);
     
     try {
       const q = query(collection(db, 'todo'), where('status', '==', 'comp'));
       const querySnapshot = await getDocs(q);
       
       // 확인 메시지
-      const count = querySnapshot.size;
-      if (count === 0) {
-        alert('삭제할 완료 요청이 없습니다.');
-        setShowDeleteConfirmation(false);
-        setIsAdminDeleteAuth(false);
+      if (querySnapshot.empty) {
+        console.log('삭제할 완료 항목이 없습니다.');
         return;
       }
       
-      // 삭제 확인 과정
-      if (showDeleteConfirmation) {
-        // 삭제 작업 실행
-        const deletePromises = querySnapshot.docs.map(docSnapshot => 
-          deleteDoc(doc(db, 'todo', docSnapshot.id))
-        );
-        
-        await Promise.all(deletePromises);
-        alert(`완료된 요청 ${count}개가 삭제되었습니다.`);
-        setShowDeleteConfirmation(false);
-        setIsAdminDeleteAuth(false);
-      }
+      console.log(`총 ${querySnapshot.size}개의 완료 항목을 삭제합니다.`);
+      
+      // 삭제 작업 실행
+      const deletePromises = querySnapshot.docs.map(docSnapshot => 
+        deleteDoc(doc(db, 'todo', docSnapshot.id))
+      );
+      
+      await Promise.all(deletePromises);
+      console.log('모든 완료 항목이 삭제되었습니다.');
+      
+      // 관리자 인증 상태 초기화
+      setIsAdmin(false);
     } catch (error) {
-      console.error('대량 삭제 오류:', error);
-      alert('삭제 중 오류가 발생했습니다.');
-      setShowDeleteConfirmation(false);
-      setIsAdminDeleteAuth(false);
+      console.error('일괄 삭제 중 오류 발생:', error);
     }
   };
 
@@ -508,40 +472,62 @@ export default function PickupPage() {
 
   // 사용자 이름 가져오기
   const getUserName = async (email: string | null): Promise<string> => {
-    if (!email) return '미상';
+    if (!email) return '알 수 없음';
     
     try {
-      const userDocRef = doc(db, 'users', email);
-      const userDocSnap = await getDoc(userDocRef);
+      const userRef = doc(db, 'users', email);
+      const userSnap = await getDoc(userRef);
       
-      if (userDocSnap.exists()) {
-        const userData = userDocSnap.data();
-        return userData.name || email.split('@')[0] || '미상';
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        // userData가 undefined일 수 있으므로 옵셔널 체이닝 사용
+        return userData?.name || email.split('@')[0] || '미상';
       } else {
-        console.log('사용자 문서가 없습니다:', email);
+        // 사용자 문서가 없다면 이메일의 @ 앞부분을 이름으로 사용
         return email.split('@')[0] || '미상';
       }
     } catch (error) {
-      console.error('사용자 이름 가져오기 오류:', error);
-      return email.split('@')[0] || '미상';
+      console.error('사용자 이름 조회 오류:', error);
+      return '오류';
     }
   };
 
   // 모달 확인 버튼 처리
   const handleConfirmProcess = async () => {
-    if (!selectedTodo) return;
+    setModalVisible(false);
     
-    // 현재 시간을 ISO 문자열로 저장
-    const now = new Date().toISOString();
+    if (!selectedTodo) return;
     
     // 현재 로그인한 사용자 정보를 담당자로 저장
     const currentUser = auth.currentUser;
     const handledBy = await getUserName(currentUser?.email || null);
     
-    updateTodoStatus(selectedTodo.id, 'ing', cartCount, handledBy, now);
-    setModalVisible(false);
-    setSelectedTodo(null);
+    // 현재 시간을 ISO 문자열로 저장
+    const startTime = new Date().toISOString();
+    
+    // 카트 수를 기본값으로 설정
+    const cartCnt = cartCount || '0';
+    
+    // 상태 업데이트
+    await updateTodoStatus(selectedTodo.id, 'ing', cartCnt, handledBy, startTime);
+    
+    // 폼 초기화
     setCartCount('');
+    setSelectedTodo(null);
+    
+    // 수동으로 새로고침 처리
+    const q = query(collection(db, 'todo'));
+    onSnapshot(q, (querySnapshot) => {
+      const todoItems: TodoItem[] = [];
+      querySnapshot.forEach((doc) => {
+        todoItems.push({
+          id: doc.id,
+          ...doc.data() as Omit<TodoItem, 'id'>
+        });
+      });
+      
+      setTodos(todoItems);
+    });
   };
 
   // 데이터 새로고침
@@ -656,8 +642,7 @@ export default function PickupPage() {
         setDetailModalVisible(false);
         setCompTodo(null);
       } catch (error) {
-        console.error('요청 삭제 오류:', error);
-        alert('삭제에 실패했습니다.');
+        console.error('삭제 오류:', error);
       }
     }
   };
@@ -1113,7 +1098,7 @@ export default function PickupPage() {
               
               <TouchableOpacity 
                 style={[styles.modalConfirmButton, { backgroundColor: '#e53935' }]}
-                onPress={handleBulkDelete}
+                onPress={confirmBulkDelete}
               >
                 <TextWithColor style={styles.modalButtonText}>삭제</TextWithColor>
               </TouchableOpacity>

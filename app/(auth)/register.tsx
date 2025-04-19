@@ -5,7 +5,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/config/firebase';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -37,7 +37,7 @@ export default function RegisterScreen() {
       await setDoc(doc(db, 'users', user.uid), {
         email: user.email,
         name: name,
-        createdAt: new Date(),
+        createdAt: serverTimestamp(),
         role: 'user'
       });
 
